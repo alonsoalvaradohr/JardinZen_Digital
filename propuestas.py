@@ -18,6 +18,11 @@ import inventario
 STATE_DIR = inventario.STATE_DIR
 DB_FILE = STATE_DIR / "propuestas.sqlite3"
 BATCH_SIZE = 30
+BUILD_ID = "jz018-paginated-v3"
+GENERIC_TOKENS = {"csv", "pdf", "txt", "md", "json", "xml", "yaml", "yml", "xlsx", "xls",
+                  "docx", "doc", "pptx", "ppt", "log", "file", "data", "report", "readme",
+                  "export", "scan", "sin", "fecha", "system", "audit", "test", "temp",
+                  "backup", "copy", "final", "draft", "result", "measurement", "telemetry"}
 
 
 def _now():
@@ -59,19 +64,38 @@ def _inside(path, root):
         return False
 
 
-def _pot_files(inv, roots):
-    """Read only indexed rows inside allowed pot prefixes, without path probing."""
+def _sqlite_nocase_key(value):
+    """Mirror SQLite's ASCII NOCASE order for a stable cross-root cursor."""
+    return str(value).translate(str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"))
+
+
+def _pot_file_count(inv, roots):
+    total = 0
+    for root in roots:
+        prefix = root.rstrip("\\/") + os.sep
+        total += inv.execute("""SELECT count(*) FROM items WHERE kind='file'
+          AND path>=? COLLATE NOCASE AND path<? COLLATE NOCASE""", (prefix, prefix + "\uffff")).fetchone()[0]
+    return total
+
+
+def _pot_files(inv, roots, after=None, limit=BATCH_SIZE):
+    """Fetch at most limit rows per pot from the existing metadata map."""
     found = {}
     for root in roots:
         prefix = root.rstrip("\\/") + os.sep
-        rows = inv.execute("""SELECT path,parent,name,extension,size,modified FROM items
-          WHERE kind='file' AND lower(substr(path,1,length(?)))=lower(?) ORDER BY path""",
-          (prefix, prefix)).fetchall()
-        for row in rows:
+        sql = """SELECT path,parent,name,extension,size,modified FROM items
+          WHERE kind='file' AND path>=? COLLATE NOCASE AND path<? COLLATE NOCASE"""
+        params = [prefix, prefix + "\uffff"]
+        if after:
+            sql += " AND path>? COLLATE NOCASE"
+            params.append(after)
+        sql += " ORDER BY path COLLATE NOCASE,path LIMIT ?"
+        params.append(limit)
+        for row in inv.execute(sql, params).fetchall():
             path = os.path.abspath(os.path.normpath(row["path"] if isinstance(row, sqlite3.Row) else row[0]))
             if _inside(path, root) and path.casefold() != root.casefold():
                 found[path.casefold()] = (path, row)
-    return [found[key] for key in sorted(found)]
+    return sorted(found.values(), key=lambda item: (_sqlite_nocase_key(item[0]), item[0]))[:limit]
 
 
 def _project_candidates(db):
@@ -84,12 +108,18 @@ def _project_candidates(db):
 
 
 def _match(name, projects):
-    tokens = set(re.findall(r"[a-z0-9]{3,}", name.casefold()))
+    # La extensión/formato no identifica un proyecto (p. ej., CSV no es
+    # evidencia para asociar un archivo con el plugin rainbow-csv).
+    tokens = set(re.findall(r"[a-z0-9]{3,}", Path(name).stem.casefold())) - GENERIC_TOKENS
     scored = []
     for path, project, kind, evidence in projects:
         pt = set(re.findall(r"[a-z0-9]{3,}", str(project).casefold()))
+        pt -= GENERIC_TOKENS
         overlap = tokens & pt
-        if overlap:
+        # Un token común no basta para asignar un archivo a un árbol.
+        # Un nombre de proyecto de una sola palabra aún puede coincidir si
+        # esa palabra sobrevivió al filtro genérico.
+        if overlap and (len(overlap) >= 2 or len(pt) == 1):
             scored.append((len(overlap) / max(1, len(pt)), project, path, sorted(overlap), kind))
     scored.sort(reverse=True)
     if not scored or (len(scored) > 1 and scored[0][0] == scored[1][0]):
@@ -108,11 +138,10 @@ def start():
     if not inventario.DB_FILE.exists():
         return {"status": "error", "error": "No existe un mapa de metadatos local."}
     with closing(sqlite3.connect(f"file:{inventario.DB_FILE.as_posix()}?mode=ro", uri=True, timeout=5)) as inv:
-        entries = _pot_files(inv, roots)
-    paths = [path for path, _ in entries]
+        total = _pot_file_count(inv, roots)
     db = _connect()
     cur = db.execute("INSERT INTO jobs(created_at,updated_at,status,roots,total) VALUES(?,?,?,?,?)",
-                     (_now(), _now(), "running", json.dumps(roots, ensure_ascii=False), len(paths)))
+                     (_now(), _now(), "running", json.dumps(roots, ensure_ascii=False), total))
     job_id = cur.lastrowid
     db.commit(); db.close()
     return process(job_id)
@@ -127,13 +156,8 @@ def process(job_id=None):
     roots = json.loads(job["roots"])
     with closing(sqlite3.connect(f"file:{inventario.DB_FILE.as_posix()}?mode=ro", uri=True, timeout=5)) as inv:
         inv.row_factory = sqlite3.Row
-        rows = _pot_files(inv, roots)
+        rows = _pot_files(inv, roots, after=job["cursor"], limit=BATCH_SIZE)
     rows = [{"path": path, **dict(row)} for path, row in rows]
-    # La comparación del cursor ignora mayúsculas; ordenar con la misma regla
-    # evita saltos/repeticiones cuando SQLite devuelve rutas con casing mixto.
-    rows.sort(key=lambda row: row["path"].casefold())
-    if job["cursor"]:
-        rows = [r for r in rows if r["path"].casefold() > job["cursor"].casefold()]
     batch = rows[:BATCH_SIZE]
     projects = _project_candidates(db)
     for row in batch:

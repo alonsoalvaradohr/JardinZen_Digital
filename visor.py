@@ -151,10 +151,15 @@ def recent_run_events(limit=12):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "JardineroVisor/1.0"
+    server_version = "JardineroVisor/1.1"
 
     def do_GET(self):
         route = urlparse(self.path).path
+        if route == "/api/health":
+            self._json({"app": "JardineroVisor", "build": "JZ-018-proposals-api-v1",
+                        "proposal_build": propuestas.BUILD_ID, "proposal_api": True,
+                        "host": HOST, "port": PORT})
+            return
         if route == "/api/inventory/status":
             self._json(inventario.status())
             return

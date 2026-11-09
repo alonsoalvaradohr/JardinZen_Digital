@@ -48,6 +48,10 @@ La documentación oficial de [plugins core](https://obsidian.md/help/plugins) de
 
 ### Próximos hitos
 
+**JZ-018 activo:** [Visor de propuestas, trazabilidad y World Model](tickets/active/JZ-018-visor-trazabilidad-y-world-model.md). Northstar y ontología durables se describen en `NORTHSTAR.md` y `WORLD_MODEL.md`. Incidente del visor: HTML actualizado con proceso Python obsoleto que no cargó endpoints JZ-017; el lanzador debe validar `/api/proposals/status`.
+
+**Estado semántico corregido:** la tubería JZ-017 existente es metadata-only, no indexación semántica por contenido. `index.sqlite3` contiene solo documentos del flujo previo; inventario completo y catálogo de árboles no tienen embeddings ni resuelven hojas a ramas por comprensión documental. La fase semántica por archivo sigue pendiente y no debe ejecutarse sobre roots nuevas sin autorización.
+
 **Nuevo ticket:** [JZ-017 — Tubería clasificadora contextual basada en el cerebro del Jardín](tickets/JZ-017-tuberia-clasificacion-contextual.md). Prioridad P0 para corregir la arquitectura que produjo clasificación genérica por muestra parcial. Introduce inventario por archivo, consulta del mapa/proyectos existentes, evidencia y relaciones locales, consenso por grupo, propuesta de nombres/rutas y revisión previa. La primera entrega es modo propuesta; no concede permiso para escribir en `[CLOUD_ROOT]` ni otras raíces externas.
 
 **Estado:** F0 y F1 están ejecutadas. La siguiente fase activa es F2 — grafo simbólico verificable; F3/F4 añadirán catálogo de metadatos y semántica local en trabajos durables. La vista actual es un primer paisaje navegable, no un cerebro semántico terminado.

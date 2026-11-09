@@ -1,5 +1,8 @@
 # TASKS — Secuencia concreta
 
+- [ ] **JZ-018** Reparar salud/reinicio del visor; establecer Northstar y World Model; registrar verificación y commit local.
+- [ ] **JZ-017 siguiente iteración** Extracción/indexación semántica por archivo y asignación explicable de parcela/árbol/arbusto/rama; solo modo propuesta hasta autorización gobernada.
+
 - [ ] **F0** Iniciar `INICIAR.cmd`: resolver rutas oficiales Windows; crear macetas y jardín físicos, SQLite y `STATE.md`.
 - [ ] **F0.1** Comprobar que el estado se persiste en `%LOCALAPPDATA%\JardinZen`.
 - [ ] **F1** Detectar Ollama/instalar vía winget si falta; descargar `qwen2.5:3b` y `qwen3-embedding:0.6b` al equipo.

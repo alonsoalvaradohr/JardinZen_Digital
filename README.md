@@ -60,7 +60,11 @@ La búsqueda existente del índice principal es léxica/vectorial sobre los docu
 
 ## Visor visual local
 
-Abre `ABRIR_JARDIN.cmd` para iniciar el visor y abrir `http://127.0.0.1:8765`. La arboleda muestra los 226 árboles detectados desde el mapa de metadatos; las macetas reflejan el contenido actual de las carpetas `00_MACETA`. El panel de inventario controla únicamente el barrido metadata-only. El panel de proyectos permite volver a ejecutar la detección desde los marcadores.
+Abre `ABRIR_JARDIN.cmd` para iniciar el visor y abrir `http://127.0.0.1:8765`. El lanzador comprueba `/api/health`; si la página visible es más nueva que el proceso Python activo, reinicia únicamente el servidor Jardinero cuya línea de comandos apunta al `visor.py` de esta carpeta. Si otro programa ocupa el puerto, se detiene sin matar ese proceso. El panel de propuestas informa progreso y errores HTTP.
+
+La arboleda muestra árboles candidatos desde el mapa de metadatos; las macetas reflejan el contenido actual de `00_MACETA`. El panel de inventario controla el barrido metadata-only y el de proyectos vuelve a ejecutar la detección por marcadores. Northstar: `NORTHSTAR.md`; entidades, capas de índice y tipos de evidencia: `WORLD_MODEL.md`.
+
+**Alcance semántico actual:** el mapa completo contiene metadatos, y el descubrimiento identifica candidatos estructurales. `index.sqlite3` contiene texto/FTS/embeddings solo de documentos procesados por F1. JZ-017 compara tokens de nombres contra el catálogo; no indexa contenido ni resuelve ramas temáticas como `evidence/thermal-test`. Ningún botón de propuestas trasplanta archivos.
 
 Para cerrar el servidor local, ejecuta `DETENER_JARDIN.cmd`. Solo escucha en `127.0.0.1`. El índice principal `index.sqlite3` se abre en modo de solo lectura; el nuevo inventario se guarda aparte en `inventario.sqlite3` cuando se inicia desde la interfaz. No inicia el clasificador, no mueve archivos ni modifica la tarea de Jardinero. Guía de uso y prompt para retomarlo: `PROMPT_DESPLIEGUE_VISOR.md`.
 
