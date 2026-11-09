@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+import configparser
+import re
 import sqlite3
 import threading
 import time
@@ -26,6 +28,8 @@ IGNORED_COMPONENTS = {
     "$recycle.bin", "windows", "program files", "program files (x86)",
     "programdata", "appdata", "node_modules", "vendor", "site-packages",
     ".venv", "venv", "__pycache__", "dist", "build", ".npm", ".cargo", ".obsidian",
+    ".codex", ".gemini", ".platformio", ".cache", "cache", "worktrees", "backups",
+    ".pio", ".vscode", ".arduinoide", "verification", "recovery", "node_modules", "vendor", "site-packages",
 }
 
 
@@ -56,15 +60,54 @@ def _db(readonly=False):
         path TEXT PRIMARY KEY COLLATE NOCASE, project_path TEXT NOT NULL COLLATE NOCASE,
         name TEXT NOT NULL, evidence TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS project_modules_root ON project_modules(project_path);
+      CREATE TABLE IF NOT EXISTS project_candidates(
+        path TEXT PRIMARY KEY COLLATE NOCASE, name TEXT NOT NULL, kind TEXT NOT NULL,
+        markers TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'REVIEW');
     """)
     columns = {row[1] for row in db.execute("PRAGMA table_info(project_discovery)")}
     if "items_scanned" not in columns:
         db.execute("ALTER TABLE project_discovery ADD COLUMN items_scanned INTEGER NOT NULL DEFAULT 0")
+    if "candidate_count" not in columns:
+        db.execute("ALTER TABLE project_discovery ADD COLUMN candidate_count INTEGER NOT NULL DEFAULT 0")
     return db
 
 
 def _is_ignored(path: str) -> bool:
     return any(part.casefold() in IGNORED_COMPONENTS for part in Path(path).parts)
+
+
+def _repo_identity(root: str) -> str:
+    """Read Git metadata only; never invoke Git or execute repository hooks."""
+    marker = Path(root) / ".git"
+    try:
+        gitdir = marker.resolve() if marker.is_dir() else None
+        if marker.is_file():
+            match = re.search(r"(?im)^gitdir:\s*(.+?)\s*$", marker.read_text(encoding="utf-8", errors="replace"))
+            if match:
+                gitdir = (Path(root) / match.group(1)).resolve()
+        if not gitdir:
+            return "path:" + os.path.normcase(os.path.abspath(root))
+        common = gitdir
+        common_file = gitdir / "commondir"
+        if common_file.is_file():
+            common = (gitdir / common_file.read_text(encoding="utf-8", errors="replace").strip()).resolve()
+        cfg = configparser.ConfigParser(interpolation=None, strict=False)
+        cfg.read(common / "config", encoding="utf-8")
+        remote = cfg.get('remote "origin"', "url", fallback="").strip().casefold()
+        remote = re.sub(r"^https?://[^/@]+(?::[^/@]*)?@", "https://", remote)
+        remote = re.sub(r"\.git/?$", "", remote).rstrip("/")
+        if remote:
+            return "origin:" + remote
+        return "common:" + os.path.normcase(str(common))
+    except (OSError, ValueError, configparser.Error):
+        return "path:" + os.path.normcase(os.path.abspath(root))
+
+
+def _canonical_preference(root: str) -> tuple[int, int, str]:
+    low = root.casefold()
+    archival = any(token in low for token in ("_archive", "\\backup", "\\restored", "\\verification", "\\recovery", "\\worktrees"))
+    canonical = "canonical" in low or "\\work\\" in low
+    return (1 if archival else 0, 0 if canonical else 1, low)
 
 
 def _ancestors(path: str):
@@ -92,14 +135,15 @@ def _subtree_stats(db: sqlite3.Connection, root: str):
         FROM items WHERE path>=? COLLATE NOCASE AND path<? COLLATE NOCASE""", (low, high)).fetchone()
 
 
-def _aggregate_project_stats(db: sqlite3.Connection, roots: list[str], run_id: int):
+def _aggregate_project_stats(db: sqlite3.Connection, roots: list[str], run_id: int, allowed_roots: list[str]):
     """Cuenta todos los subárboles en una sola pasada, incluyendo raíces anidadas."""
     by_path = {root.casefold().rstrip("\\/"): i for i, root in enumerate(roots)}
     totals = [[0, 0, 0] for _ in roots]
     scanned = 0
     reader = sqlite3.connect(f"file:{DB_FILE.as_posix()}?mode=ro", uri=True, timeout=30)
     try:
-        cursor = reader.execute("SELECT path,kind,size FROM items ORDER BY path COLLATE NOCASE")
+        marks = ",".join("?" for _ in allowed_roots)
+        cursor = reader.execute(f"SELECT path,kind,size FROM items WHERE root IN ({marks}) ORDER BY path COLLATE NOCASE", allowed_roots)
         while True:
             batch = cursor.fetchmany(20_000)
             if not batch:
@@ -159,7 +203,8 @@ def status() -> dict:
         if not table:
             db.close()
             return {"status": "not_started", "projects": 0, "modules": 0, "markers": 0}
-        row = db.execute("SELECT id,started_at,updated_at,finished_at,status,marker_count,project_count,module_count,error,items_scanned FROM project_discovery ORDER BY id DESC LIMIT 1").fetchone()
+        row = db.execute("SELECT id,started_at,updated_at,finished_at,status,marker_count,project_count,module_count,error,items_scanned,candidate_count FROM project_discovery ORDER BY id DESC LIMIT 1").fetchone()
+        shrubs = db.execute("SELECT count(*) FROM project_candidates WHERE status='REVIEW'").fetchone()[0]
         db.close()
         if not row:
             return {"status": "not_started", "projects": 0, "modules": 0, "markers": 0}
@@ -167,7 +212,7 @@ def status() -> dict:
         state = "interrupted" if row[4] in ("running", "indexando") and not alive else row[4]
         return {"run_id": row[0], "started_at": row[1], "updated_at": row[2], "finished_at": row[3],
                 "status": state, "markers": row[5], "projects": row[6], "modules": row[7],
-                "error": row[8], "items_scanned": row[9], "worker_alive": alive}
+                "error": row[8], "items_scanned": row[9], "shrubs": max(shrubs, row[10] or 0), "worker_alive": alive}
     except sqlite3.Error as exc:
         return {"status": "error", "error": str(exc), "projects": 0, "modules": 0, "markers": 0}
 
@@ -215,13 +260,20 @@ def _worker(run_id: int) -> None:
         db.execute("UPDATE project_discovery SET status='analizando',updated_at=? WHERE id=?", (_now(), run_id)); db.commit()
         manifest_names = tuple(sorted(MANIFESTS | {".git"}))
         name_marks = ",".join("?" for _ in manifest_names)
-        manifest_rows = db.execute(f"SELECT path,parent,name FROM items WHERE name COLLATE NOCASE IN ({name_marks})",
-                                   manifest_names).fetchall()
+        run = db.execute("SELECT roots FROM runs ORDER BY id DESC LIMIT 1").fetchone()
+        allowed_roots = json.loads(run[0]) if run else []
+        if not allowed_roots:
+            raise RuntimeError("El mapa no tiene raíces físicas autorizadas registradas.")
+        root_marks = ",".join("?" for _ in allowed_roots)
+        manifest_rows = db.execute(f"SELECT path,parent,name FROM items WHERE root IN ({root_marks}) AND name COLLATE NOCASE IN ({name_marks})",
+                                   (*allowed_roots, *manifest_names)).fetchall()
         manifest_extensions = tuple(sorted(MANIFEST_EXTENSIONS))
         ext_marks = ",".join("?" for _ in manifest_extensions)
-        extension_rows = db.execute(f"SELECT path,parent,name FROM items WHERE extension COLLATE NOCASE IN ({ext_marks})",
-                                    manifest_extensions).fetchall()
+        extension_rows = db.execute(f"SELECT path,parent,name FROM items WHERE root IN ({root_marks}) AND extension COLLATE NOCASE IN ({ext_marks})",
+                                    (*allowed_roots, *manifest_extensions)).fetchall()
         rows = manifest_rows + extension_rows
+        db.execute("UPDATE project_discovery SET status='agrupando_marcadores',marker_count=?,updated_at=? WHERE id=?",
+                   (len(rows), _now(), run_id)); db.commit()
         git_roots = {}
         markers_by_dir: dict[str, set[str]] = {}
         dir_paths = {}
@@ -249,28 +301,52 @@ def _worker(run_id: int) -> None:
                     continue
                 standalone.append((key, markers))
         standalone.sort(key=lambda item: (len(item[0]), item[0]))
-        stand_roots: dict[str, set[str]] = {}
-        stand_modules: dict[str, dict[str, set[str]]] = {}
+        stand_roots: dict[str, tuple[str, set[str]]] = {}
         for key, markers in standalone:
-            parent_root = next((r for r in stand_roots if _inside(key, r)), None)
-            if parent_root:
-                if key != parent_root.casefold():
-                    stand_modules.setdefault(parent_root, {})[dir_paths[key]] = markers
-            else:
-                actual = dir_paths[key]
-                stand_roots[actual] = markers
-                stand_modules[actual] = {}
+            # La cadena de ancestros da coste O(profundidad), no O(n²) sobre
+            # miles de carpetas con manifiestos de dependencias instaladas.
+            parent_roots = (ancestor.casefold().rstrip("\\/") for ancestor in _ancestors(key))
+            if any(ancestor != key and ancestor in stand_roots for ancestor in parent_roots):
+                continue
+            # La clave es siempre normalizada; el casing original se conserva
+            # como valor para mostrar la ruta al usuario.
+            stand_roots[key] = (dir_paths[key], markers)
+        db.execute("UPDATE project_discovery SET status='consolidando_arboles',project_count=?,candidate_count=?,updated_at=? WHERE id=?",
+                   (len(git_roots), len(stand_roots), _now(), run_id)); db.commit()
         projects = []
         modules = []
-        for key, root in git_roots.items():
-            projects.append((root, "git", markers_by_dir.get(key, {".git"}), module_map.get(key, {})))
-        for key, markers in stand_roots.items():
-            # A second repository nested inside a parent repo is handled by its own .git marker.
-            if any(_inside(key, root) for root in git_keys.values()):
+        shrubs = [(path, os.path.basename(path.rstrip("\\/")) or path,
+                   json.dumps(sorted(markers, key=str.casefold), ensure_ascii=False), "REVIEW")
+                  for path, markers in stand_roots.values() if not _is_ignored(path)]
+        # Sólo una raíz Git independiente crea un árbol. Manifiestos fuera de
+        # Git quedan como evidencia/módulos; no se cuentan como proyectos.
+        raw_roots = sorted(git_roots.values(), key=lambda p: (len(p), p.casefold()))
+        top_roots = [root for root in raw_roots
+                     if not _is_ignored(root) and not any(_inside(root, other) for other in raw_roots if other != root)]
+        grouped: dict[str, list[str]] = {}
+        for root in top_roots:
+            grouped.setdefault(_repo_identity(root), []).append(root)
+        for group_index, (identity, candidates) in enumerate(grouped.items(), 1):
+            candidates.sort(key=_canonical_preference)
+            root = candidates[0]
+            key = root.casefold()
+            # Un marcador .git sin archivos no representa un árbol vivo.
+            prefix = root.rstrip("\\/") + "\\"
+            has_files = db.execute("SELECT 1 FROM items WHERE kind='file' AND path>=? COLLATE NOCASE AND path<? COLLATE NOCASE LIMIT 1",
+                                   (prefix, prefix + "\uffff")).fetchone()
+            if not has_files:
                 continue
-            projects.append((key, "manifest", markers, stand_modules.get(key, {})))
+            root_modules = dict(module_map.get(key, {}))
+            for duplicate in candidates[1:]:
+                root_modules[duplicate] = {"same_repository_identity"}
+            projects.append((root, "git", markers_by_dir.get(key, {".git"}), root_modules))
+            if group_index % 5 == 0:
+                db.execute("UPDATE project_discovery SET status='validando_arboles',project_count=?,updated_at=? WHERE id=?",
+                           (group_index, _now(), run_id)); db.commit()
         projects.sort(key=lambda p: p[0].casefold())
-        project_stats = _aggregate_project_stats(db, [p[0] for p in projects], run_id)
+        db.execute("UPDATE project_discovery SET status='resumiendo_mapa',project_count=?,updated_at=? WHERE id=?",
+                   (len(projects), _now(), run_id)); db.commit()
+        project_stats = _aggregate_project_stats(db, [p[0] for p in projects], run_id, allowed_roots)
         payload = []
         for index, (root, kind, markers, module_dirs) in enumerate(projects, 1):
             files, dirs, size = project_stats[index - 1]
@@ -292,11 +368,18 @@ def _worker(run_id: int) -> None:
         db.execute("BEGIN IMMEDIATE")
         db.execute("DELETE FROM project_modules")
         db.execute("DELETE FROM projects")
+        db.execute("DELETE FROM project_candidates")
         db.executemany("INSERT INTO projects(path,name,kind,volume,plot_path,evidence,file_count,dir_count,bytes,branch_count,module_count) VALUES(?,?,?,?,?,?,?,?,?,?,?)", payload)
         db.executemany("INSERT INTO project_modules(path,project_path,name,evidence) VALUES(?,?,?,?)", modules)
-        db.execute("UPDATE project_discovery SET status='complete',marker_count=?,project_count=?,module_count=?,updated_at=?,finished_at=?,error=NULL WHERE id=?",
-                   (len(rows), len(payload), len(modules), _now(), _now(), run_id))
+        db.executemany("INSERT INTO project_candidates(path,name,kind,markers,status) VALUES(?,?, 'shrub', ?,?)", shrubs)
+        db.execute("UPDATE project_discovery SET status='complete',marker_count=?,project_count=?,module_count=?,candidate_count=?,updated_at=?,finished_at=?,error=NULL WHERE id=?",
+                   (len(rows), len(payload), len(modules), len(shrubs), _now(), _now(), run_id))
         db.commit()
+        try:
+            import brain
+            brain.sync_markdown()
+        except Exception:
+            pass
     except Exception as exc:
         if db:
             db.rollback()

@@ -33,10 +33,11 @@
 ### Hecho en esta iteración
 
 - `inventario.py` implementa un primer recorrido recursivo de unidades locales fijas. Lee metadatos, no el contenido. No sigue reparse points, y registra errores y checkpoints en `%LOCALAPPDATA%\JardinZen\inventario.sqlite3`.
-- `visor.py` expone estado y controles locales para iniciar, pausar, reanudar y detener; no toca el clasificador ni `index.sqlite3`.
+- `visor.py` expone estado y controles locales para inventario, propuestas y cerebro RAW/RAG.
 - `visor.html` muestra avance, unidades, errores y exclusiones.
 - El primer recorrido terminó en C:, D: y E:: 3,415,257 entradas, 495,330 carpetas, 303 errores de acceso, 203 enlaces/reparse points omitidos y 153 carpetas excluidas. Estado `complete_with_errors`; no equivale a cobertura perfecta.
-- `proyectos.py` detectó 226 árboles (45 con `.git`, 181 candidatos con manifiestos) y 606 módulos, a partir de 9,481 marcadores. Una señal `Makefile` sola no crea árbol; los repositorios conservan esa evidencia como módulo cuando aplica. No se leyó contenido.
+- `proyectos.py` recatalogó 13 raíces Git, 61 módulos y 36 arbustos candidatos, a partir de 9,478 marcadores. El anterior 226 mezclaba manifiestos y repositorios. Carpetas de herramientas/paquetes se excluyen para reducir falsos candidatos.
+- JZ-019 creó `brain.sqlite3` con extracción RAW, FTS5, chunks, embeddings Ollama y cursor durable. El primer job C:/D:/E: cuenta 2,918,993 archivos; el checkpoint registrado fue 23,218 inspeccionados, 181 documentos extraídos y 1,800 chunks vectorizados. El job sigue corriendo en segundo plano.
 - `visor.html` ahora visualiza los árboles detectados agrupados por carpeta contenedora. La agrupación indica vecindad en el disco, no relación semántica. Tamaño = archivos del subárbol; ramas principales = carpetas inmediatas. El drag solo persiste coordenadas en el navegador.
 - El inventario y el mapa son una línea base. No detectan todavía altas/cambios/eliminaciones en forma incremental, ni extraen enlaces, imports o dependencias.
 
@@ -50,11 +51,11 @@ La documentación oficial de [plugins core](https://obsidian.md/help/plugins) de
 
 **JZ-018 activo:** [Visor de propuestas, trazabilidad y World Model](tickets/active/JZ-018-visor-trazabilidad-y-world-model.md). Northstar y ontología durables se describen en `NORTHSTAR.md` y `WORLD_MODEL.md`. Incidente del visor: HTML actualizado con proceso Python obsoleto que no cargó endpoints JZ-017; el lanzador debe validar `/api/proposals/status`.
 
-**Estado semántico corregido:** la tubería JZ-017 existente es metadata-only, no indexación semántica por contenido. `index.sqlite3` contiene solo documentos del flujo previo; inventario completo y catálogo de árboles no tienen embeddings ni resuelven hojas a ramas por comprensión documental. La fase semántica por archivo sigue pendiente y no debe ejecutarse sobre roots nuevas sin autorización.
+**Estado semántico corregido:** JZ-019 ya extrae e indexa contenido con FTS + embeddings locales. La relación documento→árbol sigue siendo contención de ruta (hecho); no genera todavía clasificación semántica archivo→árbol/arbusto ni trasplantes. Eso sigue pendiente de modelado y evaluación con datos etiquetados.
 
 **Nuevo ticket:** [JZ-017 — Tubería clasificadora contextual basada en el cerebro del Jardín](tickets/JZ-017-tuberia-clasificacion-contextual.md). Prioridad P0 para corregir la arquitectura que produjo clasificación genérica por muestra parcial. Introduce inventario por archivo, consulta del mapa/proyectos existentes, evidencia y relaciones locales, consenso por grupo, propuesta de nombres/rutas y revisión previa. La primera entrega es modo propuesta; no concede permiso para escribir en `[CLOUD_ROOT]` ni otras raíces externas.
 
-**Estado:** F0 y F1 están ejecutadas. La siguiente fase activa es F2 — grafo simbólico verificable; F3/F4 añadirán catálogo de metadatos y semántica local en trabajos durables. La vista actual es un primer paisaje navegable, no un cerebro semántico terminado.
+**Estado:** F0 y F1 están ejecutadas; JZ-019 ejecuta RAW/RAG local en segundo plano. La siguiente fase es asignación contextual candidata con datos evaluables, luego F2 — grafo simbólico verificable. La vista es navegable y consultable, pero aún no un clasificador autónomo.
 
 | Fase | Resultado | Estado / siguiente criterio |
 |---|---|---|

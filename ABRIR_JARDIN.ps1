@@ -13,22 +13,29 @@ if ($response -and $response.StatusCode -eq 200 -and ($response.Content | Conver
 
     # HTML se sirve desde disco, pero Python conserva sus imports en memoria.
     # Reiniciar solo este visor; nunca terminar un proceso ajeno del puerto.
-    $connections = Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue
-    foreach ($connection in $connections) {
-        $process = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $connection.OwningProcess) -ErrorAction SilentlyContinue
-        $runtimeProcess = if ($process) { Get-Process -Id $process.ProcessId -ErrorAction SilentlyContinue } else { $null }
-        $sourceNewer = $false
-        foreach ($sourcePath in @($script, (Join-Path $PSScriptRoot 'propuestas.py'), (Join-Path $PSScriptRoot 'visor.html'))) {
-            if ($runtimeProcess -and (Test-Path -LiteralPath $sourcePath) -and (Get-Item -LiteralPath $sourcePath).LastWriteTime -gt $runtimeProcess.StartTime) { $sourceNewer = $true }
-        }
-        if ($process -and $runtimeProcess -and $process.Name -match '^python(w)?\.exe$' -and $process.CommandLine -match [regex]::Escape($script) -and -not $sourceNewer -and $health -and $health.proposal_api -and $health.proposal_build -eq 'jz018-paginated-v3') {
-            Start-Process $url
-            exit 0
-        } elseif ($process -and $runtimeProcess -and $process.Name -match '^python(w)?\.exe$' -and $process.CommandLine -match [regex]::Escape($script)) {
-            Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
-        } else {
+    $connections = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+    $owners = @($connections | Select-Object -ExpandProperty OwningProcess -Unique)
+    $ownedProcesses = @(Get-CimInstance Win32_Process | Where-Object {
+        $_.Name -match '^python(w)?\.exe$' -and $_.CommandLine -match [regex]::Escape($script)
+    })
+    foreach ($owner in $owners) {
+        if (-not ($ownedProcesses | Where-Object { $_.ProcessId -eq $owner })) {
             throw "El puerto $port lo ocupa otro proceso; no se detuvo."
         }
+    }
+    if ($ownedProcesses.Count -gt 0) {
+        $sourceNewer = $false
+        foreach ($process in $ownedProcesses) {
+            $runtimeProcess = Get-Process -Id $process.ProcessId -ErrorAction SilentlyContinue
+            foreach ($sourcePath in @($script, (Join-Path $PSScriptRoot 'propuestas.py'), (Join-Path $PSScriptRoot 'proyectos.py'), (Join-Path $PSScriptRoot 'brain.py'), (Join-Path $PSScriptRoot 'visor.py'), (Join-Path $PSScriptRoot 'visor.html'))) {
+                if ($runtimeProcess -and (Test-Path -LiteralPath $sourcePath) -and (Get-Item -LiteralPath $sourcePath).LastWriteTime -gt $runtimeProcess.StartTime) { $sourceNewer = $true }
+            }
+        }
+        if ($ownedProcesses.Count -eq 1 -and -not $sourceNewer -and $health -and $health.proposal_api -and $health.proposal_build -eq 'jz018-paginated-v3' -and $health.brain_build -eq 'jz019-brain-rawrag-v1') {
+            Start-Process $url
+            exit 0
+        }
+        foreach ($process in $ownedProcesses) { Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop }
     }
 }
 
@@ -43,8 +50,12 @@ foreach ($candidate in $candidates) {
 if (-not $python) {
     $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
     if ($launcher) {
-        & $launcher.Source -3 -c 'import sys; raise SystemExit(sys.version_info < (3,10))' 2>$null
-        if ($LASTEXITCODE -eq 0) { $python = $launcher.Source; $prefix = @('-3') }
+        $resolvedPython = (& $launcher.Source -3 -c 'import sys; print(sys.executable)' 2>$null | Select-Object -Last 1)
+        if ($LASTEXITCODE -eq 0 -and $resolvedPython -and (Test-Path -LiteralPath $resolvedPython.Trim())) {
+            $python = $resolvedPython.Trim()
+            & $python -c 'import sys; raise SystemExit(sys.version_info < (3,10))' 2>$null
+            if ($LASTEXITCODE -ne 0) { $python = $null }
+        }
     }
 }
 if (-not $python) {
@@ -68,7 +79,7 @@ for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Milliseconds 400
     try {
         $health = Invoke-RestMethod -Uri "$url/api/health" -TimeoutSec 1
-        if ($health.proposal_api -and $health.proposal_build -eq 'jz018-paginated-v3') { $ready = $true; break }
+        if ($health.proposal_api -and $health.proposal_build -eq 'jz018-paginated-v3' -and $health.brain_build -eq 'jz019-brain-rawrag-v1') { $ready = $true; break }
     } catch { }
 }
 if (-not $ready) {

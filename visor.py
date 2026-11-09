@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import inventario
 import proyectos
 import propuestas
+import brain
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("JARDINERO_VIEWER_PORT", "8765"))
@@ -151,14 +152,18 @@ def recent_run_events(limit=12):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "JardineroVisor/1.1"
+    server_version = "JardineroVisor/1.2"
 
     def do_GET(self):
         route = urlparse(self.path).path
         if route == "/api/health":
-            self._json({"app": "JardineroVisor", "build": "JZ-018-proposals-api-v1",
+            self._json({"app": "JardineroVisor", "build": "JZ-019-brain-api-v1",
                         "proposal_build": propuestas.BUILD_ID, "proposal_api": True,
+                        "brain_build": brain.BUILD_ID,
                         "host": HOST, "port": PORT})
+            return
+        if route == "/api/brain/status":
+            self._json(brain.status())
             return
         if route == "/api/inventory/status":
             self._json(inventario.status())
@@ -170,6 +175,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if route == "/api/proposals/status":
             self._json(propuestas.status())
+            return
+        if route == "/api/brain/search":
+            from urllib.parse import parse_qs
+            query = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+            self._json(brain.search(query))
             return
         if route == "/api/overview":
             body = json.dumps(overview(), ensure_ascii=False).encode("utf-8")
@@ -197,13 +207,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         route = urlparse(self.path).path
+        if route == "/api/brain/ask":
+            try:
+                length = min(int(self.headers.get("Content-Length", "0")), 4096)
+                payload = json.loads(self.rfile.read(length) or b"{}")
+                self._json(brain.ask(str(payload.get("query", ""))))
+            except Exception as exc:
+                self._json({"status": "error", "error": f"{type(exc).__name__}: {exc}"}, 500)
+            return
         actions = {"/api/inventory/start": inventario.start,
                    "/api/inventory/pause": inventario.pause,
                    "/api/inventory/resume": inventario.resume,
                    "/api/inventory/stop": inventario.stop,
                    "/api/projects/discover": proyectos.start,
                    "/api/proposals/start": propuestas.start,
-                   "/api/proposals/next": propuestas.process}
+                   "/api/proposals/next": propuestas.process,
+                   "/api/brain/start": brain.start,
+                   "/api/brain/pause": brain.pause,
+                   "/api/brain/resume": brain.resume,
+                   "/api/brain/stop": brain.stop}
         action = actions.get(route)
         if not action:
             self.send_error(404)
@@ -229,6 +251,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     if not HTML.is_file():
         raise SystemExit(f"Falta la interfaz: {HTML}")
+    brain.resume_if_active()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Jardín local listo en http://127.0.0.1:{PORT}")
     try:
