@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "classify_model": "qwen2.5:3b",
+  "embed_model": "qwen3-embedding:0.6b",
+  "min_confidence": 0.85,
+  "max_items_per_run": 30,
+  "max_item_bytes": 1500000000,
+  "max_backup_bytes": 1500000000,
+  "schedule_minutes": 60,
+  "external_roots": [],
+  "privacy": "strict_local",
+  "permissions": "only_pots_to_garden"
+}

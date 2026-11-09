@@ -1,0 +1,42 @@
+{
+  "ticket": "JZ-017",
+  "chat_id": "00000000-0000-0000-0000-000000000000",
+  "audited_at": "2026-11-09",
+  "git_commit": null,
+  "git_commit_reason": "Source directory is not a Git repository; no baseline exists.",
+  "files": {
+    "propuestas.py": {
+      "sha256": "6868a1ce6b2bfffd1d5aca96e7343fc9121660cf5c5f8ba918ba878245455ae5",
+      "bytes": 8400
+    },
+    "visor.py": {
+      "sha256": "600f194479272f5850c9eb8b98425502ed2ef008e0ec7774a015d01db80ec6c8",
+      "bytes": 10019
+    },
+    "visor.html": {
+      "sha256": "629cf4bc5d5ce1660e187f3eb326ca5fe18d92d511b8f875e8bffbafb06ca6e6",
+      "bytes": 47769
+    },
+    "README.md": {
+      "sha256": "cb127cf67c5a2386c73963d8b30f5bd629f5161b21da10446718fddeed2ee647",
+      "bytes": 8992
+    },
+    "tickets/JZ-017-tuberia-clasificacion-contextual.md": {
+      "sha256": "f0089a313d0c3bb1502ee3646d02278fe9811868f92023e9b78bb67260d6b5ac",
+      "bytes": 12213
+    }
+  },
+  "audit_report": {
+    "path": "audits/JZ-017-AUDITORIA.md",
+    "sha256": "1aae75eea6b16f589a6d0a68e76f85a06d3099a4a18159cf023a8653aa2ebbbe",
+    "bytes": 3955
+  },
+  "verification": {
+    "py_compile": "passed",
+    "fixture_items": 75,
+    "unique_proposals": 75,
+    "mutating_states": 0,
+    "real_files_scanned": false,
+    "moves_performed": false
+  }
+}
