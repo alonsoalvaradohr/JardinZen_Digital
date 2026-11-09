@@ -1,0 +1,74 @@
+{
+  "ticket": "JZ-018",
+  "audited_at": "2026-11-09",
+  "git_commit": "727e7dab5683a5a382db7d5ff1aa4a4b528c0381",
+  "files": {
+    "ABRIR_JARDIN.ps1": {
+      "sha256": "b28ecc92941ad1e9dbae9541965e0d9b36e8d6ef84c91fc332a7ffe8cb194064",
+      "bytes": 4148
+    },
+    "propuestas.py": {
+      "sha256": "e45d169201b7ed76347259dbebac4b88f8eae5434ae08220a62bbfb7122c9d7b",
+      "bytes": 9723
+    },
+    "visor.py": {
+      "sha256": "224cda61da7eeb0b84a347c2ebfb9248697c0b3f2f4a173acc495a4d4f14713f",
+      "bytes": 10296
+    },
+    "README.md": {
+      "sha256": "5fd72e977f9cd3c822778cc1f030d5a8a0d9f73a6ee8135500a37d311d7a91f3",
+      "bytes": 9761
+    },
+    "NORTHSTAR.md": {
+      "sha256": "da6366d878bc4fec4b5fb775eb7f0f8d67b69f5e68c863eaac81711cf616d65b",
+      "bytes": 2161
+    },
+    "WORLD_MODEL.md": {
+      "sha256": "bd8c1860e7ea082713b4b1defe05bacff79835a111fff44f26fb60a4fc1aecaf",
+      "bytes": 4741
+    },
+    "BACKLOG.md": {
+      "sha256": "6b33afc516e418473b1faee51594e6335230588f8064a3b74f72e2617fbedf46",
+      "bytes": 1740
+    },
+    "ROADMAP.md": {
+      "sha256": "eab3f747d56c2a11ce787f466e7c8594d773d206615fe6763e56a8530dc3eaa7",
+      "bytes": 10016
+    },
+    "STATE.md": {
+      "sha256": "b969f10615b572e54bef5f12e394032ff03d945df6ed45148345e384f6c9ef50",
+      "bytes": 825
+    },
+    "TASKS.md": {
+      "sha256": "75b527d7c1482790653f669ebe9bcbb9748721ef8f44650db63e25d79b7efdda",
+      "bytes": 1313
+    },
+    "AGENTS.md": {
+      "sha256": "8c37b8cea885b7dbb0496eb81395eb1e4e044c0c63b89eb7c189d3b29bfc8f9b",
+      "bytes": 2967
+    },
+    "tickets/active/JZ-018-visor-trazabilidad-y-world-model.md": {
+      "sha256": "b95af74701eaecb98a9c876da9c0fcf4f85583d35d51d8b81a07db131aa43793",
+      "bytes": 4011
+    },
+    "audits/JZ-018-AUDITORIA.md": {
+      "sha256": "28d45899377c3eec77f2201ccc5f406ffc4581b85184878b982ca18a94e520ac",
+      "bytes": 3399
+    }
+  },
+  "verification": {
+    "py_compile": "passed",
+    "launcher_health_build": "jz018-paginated-v3",
+    "ui_next_batch": "persisted progress observed",
+    "fixture_items": 75,
+    "fixture_batches": [
+      30,
+      30,
+      15
+    ],
+    "mutating_states": 0,
+    "real_file_content_read": false,
+    "moves_performed": false,
+    "push_performed": false
+  }
+}
