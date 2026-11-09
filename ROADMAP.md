@@ -37,7 +37,7 @@
 - `visor.html` muestra avance, unidades, errores y exclusiones.
 - El primer recorrido terminó en C:, D: y E:: 3,415,257 entradas, 495,330 carpetas, 303 errores de acceso, 203 enlaces/reparse points omitidos y 153 carpetas excluidas. Estado `complete_with_errors`; no equivale a cobertura perfecta.
 - `proyectos.py` recatalogó 13 raíces Git, 61 módulos y 36 arbustos candidatos, a partir de 9,478 marcadores. El anterior 226 mezclaba manifiestos y repositorios. Carpetas de herramientas/paquetes se excluyen para reducir falsos candidatos.
-- JZ-019 creó `brain.sqlite3` con extracción RAW, FTS5, chunks, embeddings Ollama y cursor durable. El primer job C:/D:/E: cuenta 2,918,993 archivos; el checkpoint registrado fue 23,218 inspeccionados, 181 documentos extraídos y 1,800 chunks vectorizados. El job sigue corriendo en segundo plano.
+- JZ-019 creó `brain.sqlite3` con extracción RAW, FTS5, chunks, embeddings Ollama y cursor durable. El job de C:/D:/E: cuenta 2,918,993 archivos y sigue corriendo en segundo plano; el progreso vivo se consulta desde el visor, no desde esta instantánea de documentación.
 - `visor.html` ahora visualiza los árboles detectados agrupados por carpeta contenedora. La agrupación indica vecindad en el disco, no relación semántica. Tamaño = archivos del subárbol; ramas principales = carpetas inmediatas. El drag solo persiste coordenadas en el navegador.
 - El inventario y el mapa son una línea base. No detectan todavía altas/cambios/eliminaciones en forma incremental, ni extraen enlaces, imports o dependencias.
 
@@ -49,7 +49,7 @@ La documentación oficial de [plugins core](https://obsidian.md/help/plugins) de
 
 ### Próximos hitos
 
-**JZ-018 activo:** [Visor de propuestas, trazabilidad y World Model](tickets/active/JZ-018-visor-trazabilidad-y-world-model.md). Northstar y ontología durables se describen en `NORTHSTAR.md` y `WORLD_MODEL.md`. Incidente del visor: HTML actualizado con proceso Python obsoleto que no cargó endpoints JZ-017; el lanzador debe validar `/api/proposals/status`.
+**JZ-018 completado:** [Visor de propuestas, trazabilidad y World Model](tickets/active/JZ-018-visor-trazabilidad-y-world-model.md). Northstar y ontología durables se describen en `NORTHSTAR.md` y `WORLD_MODEL.md`.
 
 **Estado semántico corregido:** JZ-019 ya extrae e indexa contenido con FTS + embeddings locales. La relación documento→árbol sigue siendo contención de ruta (hecho); no genera todavía clasificación semántica archivo→árbol/arbusto ni trasplantes. Eso sigue pendiente de modelado y evaluación con datos etiquetados.
 
@@ -60,10 +60,10 @@ La documentación oficial de [plugins core](https://obsidian.md/help/plugins) de
 | Fase | Resultado | Estado / siguiente criterio |
 |---|---|---|
 | F0 — Inventario confiable | Barrido durable de metadatos, estados y cobertura. | **Ejecutada como línea base.** Quedan 303 rutas inaccesibles, 203 enlaces omitidos y 153 exclusiones registradas; falta reconciliación incremental. |
-| F1 — Parcelas y árboles | Repositorios Git y candidatos por manifiestos, módulos y métricas de subárbol. | **Ejecutada.** 226 árboles; marcadores objetivos guardados como evidencia. Falta revisión humana para fusionar copias/worktrees o confirmar candidatos. |
+| F1 — Parcelas y árboles | Repositorios Git y candidatos por manifiestos, módulos y métricas de subárbol. | **Ejecutada, corregida.** Último mapa: 13 raíces Git, 61 módulos y 36 arbustos candidatos; no se infiere proyecto por nombre genérico. |
 | F2 — Estructura simbólica | Enlaces Markdown, imports/dependencias soportadas, referencias Git y jerarquía de carpetas. | **Siguiente.** Aristas tipadas por procedencia, dirección, fecha y confianza; similitud no se presenta como dependencia. |
-| F3 — Catálogo / Bases | Vistas sobre propiedades sin convertir cada archivo en una nota: nombre, ruta, extensión, fechas, tamaño, hash/estado y descripción cuando exista evidencia. | Pendiente. Metadatos de origen conservan su procedencia; descripciones requieren extracción local de contenido. |
-| F4 — Semántica local / RAG | Cola durable por archivo/proyecto; extracción aprobada, FTS, chunks y embeddings locales/Ollama; estados, hashes y versión de modelo. | Pendiente. Lotes retomables y contexto acotado por parcela; sugerencias semánticas requieren evidencia y nunca se guardan como aristas ciertas automáticamente. |
+| F3 — Catálogo / Bases | Vistas sobre propiedades sin convertir cada archivo en una nota: nombre, ruta, extensión, fechas, tamaño, hash/estado y descripción cuando exista evidencia. | **Parcial.** Catálogo estructural y notas Markdown de entidades; falta una vista completa de propiedades por archivo. |
+| F4 — Semántica local / RAG | Cola durable por archivo/proyecto; extracción aprobada, FTS, chunks y embeddings locales/Ollama; estados, hashes y versión de modelo. | **Implementada y en ejecución.** Job JZ-019 reanudable en C:/D:/E:. Falta evaluación etiquetada y clasificación semántica archivo→árbol/arbusto. |
 | F5 — Jardín espacial / Canvas | Oasis, árboles, ramas, hojas, raíces tipadas, frutos y casos especiales; zoom/pan/drag y vistas locales. | **Prototipo parcial:** árboles, parcelas contenedoras y drag visual. Falta Canvas persistente/interactivo, navegación de ramas/hojas y relaciones verificables. |
 | F6 — Gobernanza | Bandeja de propuestas de poda/trasplante/renombrado con comparación previa y revisión humana. | Pendiente. Ninguna operación física se ejecuta por el mapa o IA sin previsualización, aprobación concreta, respaldo verificado y registro reversible. |
 
