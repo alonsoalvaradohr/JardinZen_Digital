@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2024-2026 Alonso Alvarado Hernández <alonsoalvaradohr>
+
 """Pruebas reales de E/S en directorios aislados; no usa el perfil Windows."""
 import importlib.util
 import json

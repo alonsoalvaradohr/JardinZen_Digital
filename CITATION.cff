@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use Jardín Zen Digital in your research, architecture, or local-first agent workflows, please cite it as below."
+title: "Jardín Zen Digital: Local-First Knowledge Graph & BRÚJULA AI OS Harness"
+version: "3.0.0"
+date-released: "2026-11-25"
+license: "AGPL-3.0-or-later"
+repository-code: "https://github.com/alonsoalvaradohr/JardinZen_Digital"
+authors:
+  - family-names: "Alvarado Hernández"
+    given-names: "Alonso"
+    alias: "alonsoalvaradohr"
+abstract: "Jardín Zen Digital is a local-first, zero-telemetry personal knowledge graph, physical workspace organizer, and BRÚJULA deterministic AI OS harness designed for sovereign intelligence and reproducible artifact management."
+keywords:
+  - "knowledge graph"
+  - "local-first"
+  - "active inference"
+  - "brujula"
+  - "agentic os"
+  - "privacy-first"
+  - "rag"

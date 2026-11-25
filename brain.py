@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2024-2026 Alonso Alvarado Hernández <alonsoalvaradohr>
+
 """RAW + FTS + embeddings locales, reanudables y aislados del journal de trasplantes."""
 from __future__ import annotations
 
